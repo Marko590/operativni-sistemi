@@ -12,11 +12,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <utime.h>
+#include <ftw.h>
 #include <sys/mman.h>
 #include <sys/stat.h> /* For mode constants */
 #include <fcntl.h>
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <grp.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <pwd.h>
@@ -25,6 +30,7 @@
 #define RD_END (0)
 #define WR_END (1)
 #define MAX_LINE (4096)
+#define SECS_PER_DAY (3600 * 24)
 #define osAssert(cond, msg) osErrorFatal(cond, msg, __FILE__, __LINE__)
 void osErrorFatal(bool cond, const char *msg, const char *fname, int line)
 {
@@ -37,29 +43,24 @@ void osErrorFatal(bool cond, const char *msg, const char *fname, int line)
     }
 }
 
+
+
 int main(int argc, char **argv)
-{
-    srand(time(NULL));
-    osAssert(2 == argc, "Upotreba: ./fifo_writer putanja_do_fifa");
+{    
+    osAssert(2 == argc, "Usage: ./1 path_to_file path_to_dest\n");
+    struct stat finfo;
 
-    int shmFd = shm_open(argv[1], O_RDWR, 0666);
+    osAssert(-1!=lstat(argv[1],&finfo),"File information fetching was unsuccessful.");
+    
+    struct passwd* uInfo=getpwuid(finfo.st_uid);
 
-    osAssert(-1 != shmFd, "Pravljenje deljene memorije nije uspelo");
-//
-    struct stat shmInfo;
+    struct group* grInfo=getgrgid(finfo.st_gid);
 
-    osAssert(-1 != fstat(shmFd, &shmInfo), "Dohvatanje inf o fajlovima nije uspelo");
-    int memTotal = shmInfo.st_size;
-    int n=memTotal/sizeof(float);
-    float *sharedArray = mmap(NULL, memTotal, PROT_READ, MAP_SHARED, shmFd, 0);
-    osAssert(MAP_FAILED != sharedArray, "Mapiranje mem u adresni prostor nie uspelo");
-    for (int i = 0; i <n;++i)
-    {
-        printf("Citamo %g\n", sharedArray[i]);
-    }
+    osAssert(NULL!=uInfo,"Fetching of userinfo was unsucessful.");
+    osAssert(NULL!=grInfo,"Fetching of groupinfo was unsucessful.");
 
-    osAssert(-1 != munmap(sharedArray, shmInfo.st_size), "Dealokacija nije uspela");
 
-    osAssert(-1 != shm_unlink(argv[1]), "Brisanje deljene memorije nije uspelo");
+
+    printf("%s %s",uInfo->pw_name,grInfo->gr_name);
     return 0;
 }
